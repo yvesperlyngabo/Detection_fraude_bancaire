@@ -1,0 +1,29 @@
+# Environnements virtuels
+venv/
+.venv/
+env/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+
+# Modèle : régénéré à l'intérieur de l'image lors du build
+model/fraud_model.pkl
+
+# Git / éditeurs / OS
+.git/
+.gitignore
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Jupyter / Streamlit
+.ipynb_checkpoints/
+.streamlit/secrets.toml
+
+# Divers
+*.zip
+README.md
