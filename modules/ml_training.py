@@ -41,7 +41,7 @@ def render(artefacts: dict, model):
             est_meilleur = row.name == artefacts.get("model_nom")
             return ["background-color: #1f4d33" if est_meilleur else "" for _ in row]
 
-        st.dataframe(comp_df_pct.style.apply(surligner_meilleur, axis=1), use_container_width=True)
+        st.dataframe(comp_df_pct.style.apply(surligner_meilleur, axis=1), width="stretch")
 
         fig = px.bar(
             comp_df.reset_index(), x="Modèle",
@@ -51,7 +51,7 @@ def render(artefacts: dict, model):
         )
         fig.update_layout(yaxis_title="Score", legend_title="Métrique",
                            paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)")
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, width="stretch")
     else:
         st.info("Comparaison indisponible — réentraînez le modèle avec la dernière version de "
                 "`train_model.py` pour l'obtenir.")

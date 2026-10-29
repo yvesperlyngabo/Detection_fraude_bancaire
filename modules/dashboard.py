@@ -66,7 +66,7 @@ def render(df_raw: pd.DataFrame, artefacts: dict | None, model):
                 template="plotly_dark",
             )
             fig.update_layout(paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)")
-            st.plotly_chart(fig, use_container_width=True)
+            st.plotly_chart(fig, width="stretch")
         with col2:
             st.subheader("Répartition globale")
             counts = df_raw["Target"].value_counts().reindex(["Normal", "Suspect", "Fraude"])
@@ -76,7 +76,7 @@ def render(df_raw: pd.DataFrame, artefacts: dict | None, model):
                 hole=0.55, template="plotly_dark",
             )
             fig.update_layout(paper_bgcolor="rgba(0,0,0,0)", showlegend=True)
-            st.plotly_chart(fig, use_container_width=True)
+            st.plotly_chart(fig, width="stretch")
 
     st.markdown("---")
     st.subheader("Pages disponibles")

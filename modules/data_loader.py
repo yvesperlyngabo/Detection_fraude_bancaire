@@ -43,7 +43,7 @@ def render():
                 if colonnes_manquantes:
                     st.error(f"Colonnes manquantes par rapport au schéma attendu : {colonnes_manquantes}")
                 else:
-                    if st.button("✅ Utiliser ce fichier", use_container_width=True):
+                    if st.button("✅ Utiliser ce fichier", width="stretch"):
                         st.session_state["df_actif"] = df_upload
                         st.session_state["df_actif_nom"] = fichier.name
                         st.rerun()
@@ -55,7 +55,7 @@ def render():
         st.caption("Génère un jeu de transactions fictives, avec le même schéma, pour tester l'application "
                    "sans fichier réel.")
         n_lignes = st.slider("Nombre de transactions à générer", 200, 5000, 2000, 100)
-        if st.button("🎲 Générer un jeu de données synthétique", use_container_width=True):
+        if st.button("🎲 Générer un jeu de données synthétique", width="stretch"):
             st.session_state["df_actif"] = generer_donnees_synthetiques(n=n_lignes)
             st.session_state["df_actif_nom"] = f"Données synthétiques ({n_lignes} lignes)"
             st.rerun()
@@ -83,7 +83,7 @@ def render():
             st.json(diag["types"])
 
         with st.expander("Aperçu des données (20 premières lignes)"):
-            st.dataframe(df_diag.head(20), use_container_width=True)
+            st.dataframe(df_diag.head(20), width="stretch")
     else:
         st.caption("Le diagnostic complet du jeu de données par défaut est disponible sur la page "
                    "*📊 Exploration des données*.")

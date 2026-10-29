@@ -33,7 +33,7 @@ def render(artefacts, model, feature_columns, top_localisations, scaler, le_targ
     st.subheader("Rapport de classification détaillé (modèle retenu)")
     rapport_df = pd.DataFrame(m["rapport_classification"]).T
     rapport_df = rapport_df.loc[m["labels_ordre"] + ["accuracy", "macro avg", "weighted avg"]]
-    st.dataframe(rapport_df.round(3), use_container_width=True)
+    st.dataframe(rapport_df.round(3), width="stretch")
 
     col1, col2 = st.columns(2)
     with col1:
@@ -45,7 +45,7 @@ def render(artefacts, model, feature_columns, top_localisations, scaler, le_targ
             labels={"x": "Prédiction", "y": "Réalité", "color": "Nombre"},
         )
         fig.update_layout(paper_bgcolor="rgba(0,0,0,0)")
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, width="stretch")
 
     with col2:
         st.subheader("Importance des variables")
@@ -57,7 +57,7 @@ def render(artefacts, model, feature_columns, top_localisations, scaler, le_targ
                 labels={"value": "Importance", "index": ""},
             )
             fig.update_layout(showlegend=False, paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)")
-            st.plotly_chart(fig, use_container_width=True)
+            st.plotly_chart(fig, width="stretch")
         else:
             st.info("Ce modèle ne fournit pas d'importance de variables native.")
 
@@ -112,7 +112,7 @@ def render(artefacts, model, feature_columns, top_localisations, scaler, le_targ
             title="Courbe précision-rappel", xaxis_title="Rappel", yaxis_title="Précision",
             template="plotly_dark", paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
         )
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, width="stretch")
 
     with col2:
         fpr, tpr, _ = roc_curve(y_test_bin, proba_fraude)
@@ -126,7 +126,7 @@ def render(artefacts, model, feature_columns, top_localisations, scaler, le_targ
             title="Courbe ROC", xaxis_title="Taux de faux positifs", yaxis_title="Taux de vrais positifs",
             template="plotly_dark", paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
         )
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, width="stretch")
 
     with col3:
         cm_seuil = confusion_matrix(y_test_bin, pred_seuil)
@@ -137,4 +137,4 @@ def render(artefacts, model, feature_columns, top_localisations, scaler, le_targ
             title=f"Matrice de confusion (seuil {seuil:.2f})",
         )
         fig.update_layout(paper_bgcolor="rgba(0,0,0,0)")
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, width="stretch")

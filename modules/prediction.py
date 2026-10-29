@@ -31,7 +31,7 @@ def render_gauge(proba_fraude: float, seuil: float):
         height=260, margin=dict(l=20, r=20, t=50, b=10),
         paper_bgcolor="rgba(0,0,0,0)", font={"color": "#E8ECF6"},
     )
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(fig, width="stretch")
 
 
 def render(df_raw, artefacts, model, scaler, le_target, feature_columns, top_localisations,
@@ -68,7 +68,7 @@ def render(df_raw, artefacts, model, scaler, le_target, feature_columns, top_loc
             0.0, 1.0, float(round(best_threshold_f1, 2)), 0.01,
         )
 
-        submit = st.form_submit_button("🔍 Analyser la transaction", use_container_width=True)
+        submit = st.form_submit_button("🔍 Analyser la transaction", width="stretch")
 
     if not submit:
         return
@@ -116,7 +116,7 @@ def render(df_raw, artefacts, model, scaler, le_target, feature_columns, top_loc
         }).sort_values("Probabilité", ascending=False)
         st.dataframe(
             probas_df.round(1).style.map(colorer_statut, subset=["Statut"]),
-            hide_index=True, use_container_width=True,
+            hide_index=True, width="stretch",
         )
 
     with col2:
@@ -129,7 +129,7 @@ def render(df_raw, artefacts, model, scaler, le_target, feature_columns, top_loc
         fig.add_hline(y=seuil_pred * 100, line_dash="dash", line_color="white",
                       annotation_text="Seuil de décision")
         fig.update_layout(showlegend=False, paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)")
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, width="stretch")
 
     with col3:
         render_gauge(proba_fraude, seuil_pred)

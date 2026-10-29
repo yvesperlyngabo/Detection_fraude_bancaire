@@ -13,7 +13,7 @@ def render(df_raw: pd.DataFrame):
     )
 
     with st.expander("Aperçu des données brutes", expanded=False):
-        st.dataframe(df_raw.head(20), use_container_width=True)
+        st.dataframe(df_raw.head(20), width="stretch")
         st.caption(f"{df_raw.shape[0]} lignes × {df_raw.shape[1]} colonnes — "
                    f"{df_raw.isnull().sum().sum()} valeurs manquantes, {df_raw.duplicated().sum()} doublons.")
 
@@ -69,7 +69,7 @@ def render(df_raw: pd.DataFrame):
         })
         st.dataframe(
             df_counts.style.map(colorer_statut, subset=["Statut"]),
-            hide_index=True, use_container_width=True,
+            hide_index=True, width="stretch",
         )
     with col2:
         fig = px.bar(
@@ -79,7 +79,7 @@ def render(df_raw: pd.DataFrame):
             title="Répartition des transactions par statut", template="plotly_dark",
         )
         fig.update_layout(showlegend=False, paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)")
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, width="stretch")
 
     st.info(
         "⚠️ La classe **Fraude** est fortement minoritaire (~3,7% des transactions dans le jeu de "
@@ -96,7 +96,7 @@ def render(df_raw: pd.DataFrame):
             title="Répartition (%) du statut selon le type de transaction",
         )
         fig.update_layout(paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)")
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, width="stretch")
     with col2:
         fig = px.histogram(
             df, x="Status operation", color="Target", barnorm="percent",
@@ -104,7 +104,7 @@ def render(df_raw: pd.DataFrame):
             title="Répartition (%) du statut selon le statut d'opération",
         )
         fig.update_layout(paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)")
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, width="stretch")
 
     # ---------------------------------------------------------------- Montant
     st.subheader("Distribution du montant selon le statut")
@@ -116,7 +116,7 @@ def render(df_raw: pd.DataFrame):
     )
     fig.update_yaxes(type="log")
     fig.update_layout(paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)")
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(fig, width="stretch")
 
     # ---------------------------------------------------------------- Localisation
     st.subheader("Taux de fraude / suspicion par localisation")
@@ -133,7 +133,7 @@ def render(df_raw: pd.DataFrame):
             title=f"Taux (%) de Fraude / Suspect - top {nb_top} localisations",
         )
         fig.update_layout(paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)")
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, width="stretch")
 
     # ---------------------------------------------------------------- Treemap
     st.subheader("Répartition croisée localisation × type de transaction")
@@ -144,7 +144,7 @@ def render(df_raw: pd.DataFrame):
         title="Volume de transactions par localisation, type et statut",
     )
     fig.update_layout(paper_bgcolor="rgba(0,0,0,0)")
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(fig, width="stretch")
 
     # ---------------------------------------------------------------- Heatmap de corrélation
     st.subheader("Corrélation entre variables numériques")
@@ -159,7 +159,7 @@ def render(df_raw: pd.DataFrame):
             template="plotly_dark", title="Matrice de corrélation",
         )
         fig.update_layout(paper_bgcolor="rgba(0,0,0,0)")
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, width="stretch")
     else:
         st.caption("Pas assez de variables numériques disponibles pour une matrice de corrélation.")
 

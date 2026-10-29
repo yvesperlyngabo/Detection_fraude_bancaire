@@ -42,7 +42,7 @@ def render(history_path: str):
 
     st.dataframe(
         df_filtre.style.map(colorer_statut, subset=["Statut prédit"]),
-        use_container_width=True, hide_index=True,
+        width="stretch", hide_index=True,
     )
 
     resume = {
@@ -58,14 +58,14 @@ def render(history_path: str):
         st.download_button(
             "⬇️ CSV", data=csv_bytes,
             file_name=f"historique_predictions_{pd.Timestamp.now().strftime('%Y%m%d_%H%M%S')}.csv",
-            mime="text/csv", use_container_width=True,
+            mime="text/csv", width="stretch",
         )
     with col2:
         pdf_bytes = generer_pdf_historique(df_filtre)
         st.download_button(
             "⬇️ PDF", data=pdf_bytes,
             file_name=f"historique_predictions_{pd.Timestamp.now().strftime('%Y%m%d_%H%M%S')}.pdf",
-            mime="application/pdf", use_container_width=True,
+            mime="application/pdf", width="stretch",
         )
     with col3:
         excel_bytes = generer_excel_historique(df_filtre, resume)
@@ -73,9 +73,9 @@ def render(history_path: str):
             "⬇️ Excel", data=excel_bytes,
             file_name=f"historique_predictions_{pd.Timestamp.now().strftime('%Y%m%d_%H%M%S')}.xlsx",
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            use_container_width=True,
+            width="stretch",
         )
     with col4:
-        if st.button("🗑️ Vider l'historique", use_container_width=True):
+        if st.button("🗑️ Vider l'historique", width="stretch"):
             vider_historique(history_path)
             st.rerun()
