@@ -53,6 +53,15 @@ class TestPreprocessing(unittest.TestCase):
         self.assertEqual(c1.loc[1, "nb_trans_7j"], 1)
         self.assertEqual(c1.loc[1, "montant_moyen_7j"], 5000)
 
+    def test_ordre_des_lignes_conserve(self):
+        """Le prétraitement ne réordonne pas les lignes (découpages train/test reproductibles)."""
+        df = self.df_test.iloc[[2, 0, 1]].reset_index(drop=True)   # ordre volontairement mélangé
+        df_clean, _ = nettoyer_et_enrichir(df)
+        self.assertEqual(list(df_clean["Identifiant operation"]), ["OP3", "OP1", "OP2"])
+        # et les valeurs restent attachées à la bonne ligne
+        ligne_op2 = df_clean[df_clean["Identifiant operation"] == "OP2"].iloc[0]
+        self.assertEqual(ligne_op2["nb_trans_7j"], 1)
+
     def test_variables_7j_hors_fenetre(self):
         """Une transaction de plus de 7 jours n'entre plus dans la fenêtre."""
         df = self.df_test.copy()

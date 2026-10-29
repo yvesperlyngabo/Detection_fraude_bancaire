@@ -28,7 +28,7 @@ def charger_donnees(csv_path: str) -> pd.DataFrame:
 
 def ajouter_variables_7j(df: pd.DataFrame) -> pd.DataFrame:
     """
-    Ajoute les variables comportementales calculées sur les 7 jours PRÉCÉDENT chaque
+    Ajoute les variables comportementales calculées sur les 7 jours précédant chaque
     transaction d'un même client :
         - montant_moyen_7j : montant moyen des transactions passées (la transaction
           courante est exclue ; sans historique, on retient le montant courant)
@@ -37,8 +37,11 @@ def ajouter_variables_7j(df: pd.DataFrame) -> pd.DataFrame:
     La fenêtre est fermée à gauche (closed="left") : seules les transactions
     strictement antérieures sont utilisées, donc aucune fuite d'information depuis
     la transaction courante ou les suivantes.
-    Les lignes sont triées par client puis par date.
+    L'ordre des lignes du dataframe d'entrée est conservé (le tri n'est que temporaire) :
+    un découpage entraînement/test avec une graine fixe reste donc identique.
     """
+    df = df.copy()
+    df["_ordre"] = np.arange(len(df))
     df = df.sort_values(["ID Clients", "Date"], kind="stable").reset_index(drop=True)
 
     fenetre = (
@@ -52,7 +55,9 @@ def ajouter_variables_7j(df: pd.DataFrame) -> pd.DataFrame:
 
     df["montant_moyen_7j"] = df["montant_moyen_7j"].fillna(df["Montant"])
     df["nb_trans_7j"] = df["nb_trans_7j"].fillna(0)
-    return df
+
+    # Retour à l'ordre d'origine
+    return df.sort_values("_ordre").drop(columns="_ordre").reset_index(drop=True)
 
 
 def nettoyer_et_enrichir(df: pd.DataFrame, top_localisations=None, nb_localisations: int = 15):

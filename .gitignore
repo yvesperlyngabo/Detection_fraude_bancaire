@@ -25,3 +25,4 @@ Thumbs.db
 # Éditeurs
 .vscode/
 .idea/
+model/cv_results*.csv
