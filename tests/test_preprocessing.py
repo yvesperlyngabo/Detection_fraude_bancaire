@@ -19,16 +19,16 @@ class TestPreprocessing(unittest.TestCase):
 
     def test_nettoyer_et_enrichir(self):
         df_clean, top_loc = nettoyer_et_enrichir(self.df_test, nb_localisations=1)
-        
+
         # Test colonnes temporelles
         self.assertIn("heure", df_clean.columns)
         self.assertIn("est_nuit", df_clean.columns)
         self.assertEqual(df_clean.iloc[2]["est_nuit"], 1) # 23h
-        
+
         # Test variables comportementales
         self.assertIn("montant_moyen_7j", df_clean.columns)
         self.assertIn("nb_trans_7j", df_clean.columns)
-        
+
         # Test regroupement localisation
         self.assertEqual(len(top_loc), 1)
         self.assertIn("Autre", df_clean["Localisation_grp"].values)
@@ -36,14 +36,35 @@ class TestPreprocessing(unittest.TestCase):
     def test_encoder_features(self):
         df_clean, _ = nettoyer_et_enrichir(self.df_test)
         X, cols = encoder_features(df_clean)
-        
+
         self.assertIsInstance(X, pd.DataFrame)
         self.assertTrue(all(c in X.columns for c in ["log_montant", "heure", "montant_moyen_7j"]))
+
+    def test_variables_7j_passe_seulement(self):
+        """Les variables 7 jours n'utilisent que les transactions passées du client."""
+        df_clean, _ = nettoyer_et_enrichir(self.df_test)
+        c1 = df_clean[df_clean["ID Clients"] == "C1"].reset_index(drop=True)
+
+        # Première transaction : aucun historique
+        self.assertEqual(c1.loc[0, "nb_trans_7j"], 0)
+        self.assertEqual(c1.loc[0, "montant_moyen_7j"], 5000)  # repli sur le montant courant
+
+        # Deuxième transaction : seule la première est dans la fenêtre
+        self.assertEqual(c1.loc[1, "nb_trans_7j"], 1)
+        self.assertEqual(c1.loc[1, "montant_moyen_7j"], 5000)
+
+    def test_variables_7j_hors_fenetre(self):
+        """Une transaction de plus de 7 jours n'entre plus dans la fenêtre."""
+        df = self.df_test.copy()
+        df.loc[1, "Date"] = "2023-01-20 11:00:00"
+        df_clean, _ = nettoyer_et_enrichir(df)
+        c1 = df_clean[df_clean["ID Clients"] == "C1"].reset_index(drop=True)
+        self.assertEqual(c1.loc[1, "nb_trans_7j"], 0)
 
     def test_preparer_transaction(self):
         df_clean, top_loc = nettoyer_et_enrichir(self.df_test)
         _, feature_columns = encoder_features(df_clean)
-        
+
         transaction = {
             "Type de transaction": "ATM",
             "Status operation": "Validé",
@@ -54,11 +75,23 @@ class TestPreprocessing(unittest.TestCase):
             "montant_moyen_7j": 6000,
             "nb_trans_7j": 2
         }
-        
+
         df_ligne = preparer_transaction(transaction, top_loc, feature_columns)
         self.assertEqual(df_ligne.shape[0], 1)
         self.assertEqual(df_ligne.shape[1], len(feature_columns))
         self.assertAlmostEqual(df_ligne["log_montant"].iloc[0], np.log1p(7000))
+
+    def test_preparer_transaction_sans_historique(self):
+        """Sans historique fourni, les défauts correspondent à ceux de l'entraînement."""
+        df_clean, top_loc = nettoyer_et_enrichir(self.df_test)
+        _, feature_columns = encoder_features(df_clean)
+        transaction = {
+            "Type de transaction": "ATM", "Status operation": "Validé",
+            "Localisation": "Dakar", "Date": "2023-01-03 12:00:00", "Montant": 7000,
+        }
+        df_ligne = preparer_transaction(transaction, top_loc, feature_columns)
+        self.assertEqual(df_ligne["nb_trans_7j"].iloc[0], 0)
+        self.assertEqual(df_ligne["montant_moyen_7j"].iloc[0], 7000)
 
 if __name__ == "__main__":
     unittest.main()

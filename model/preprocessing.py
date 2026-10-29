@@ -14,7 +14,8 @@ COLONNES_CATEGORIELLES = ["Type de transaction", "Status operation", "Localisati
 
 # Colonnes numériques (brutes + dérivées)
 COLONNES_NUMERIQUES = [
-    "log_montant", "heure", "jour_semaine", "est_weekend", "est_nuit", "nb_transactions_client"
+    "log_montant", "heure", "jour_semaine", "est_weekend", "est_nuit",
+    "nb_transactions_client", "montant_moyen_7j", "nb_trans_7j",
 ]
 
 CLASSES_CIBLE = ["Normal", "Suspect", "Fraude"]
@@ -25,12 +26,42 @@ def charger_donnees(csv_path: str) -> pd.DataFrame:
     return pd.read_csv(csv_path, sep=";")
 
 
+def ajouter_variables_7j(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Ajoute les variables comportementales calculées sur les 7 jours PRÉCÉDENT chaque
+    transaction d'un même client :
+        - montant_moyen_7j : montant moyen des transactions passées (la transaction
+          courante est exclue ; sans historique, on retient le montant courant)
+        - nb_trans_7j      : nombre de transactions passées (0 sans historique)
+
+    La fenêtre est fermée à gauche (closed="left") : seules les transactions
+    strictement antérieures sont utilisées, donc aucune fuite d'information depuis
+    la transaction courante ou les suivantes.
+    Les lignes sont triées par client puis par date.
+    """
+    df = df.sort_values(["ID Clients", "Date"], kind="stable").reset_index(drop=True)
+
+    fenetre = (
+        df.set_index("Date")
+        .groupby("ID Clients")["Montant"]
+        .rolling("7D", closed="left")
+    )
+    # L'ordre de sortie (client, date) est identique à celui du tri ci-dessus.
+    df["montant_moyen_7j"] = fenetre.mean().to_numpy()
+    df["nb_trans_7j"] = fenetre.count().to_numpy()
+
+    df["montant_moyen_7j"] = df["montant_moyen_7j"].fillna(df["Montant"])
+    df["nb_trans_7j"] = df["nb_trans_7j"].fillna(0)
+    return df
+
+
 def nettoyer_et_enrichir(df: pd.DataFrame, top_localisations=None, nb_localisations: int = 15):
     """
     Nettoie le dataframe brut et ajoute les variables dérivées utilisées par le modèle :
     - variables temporelles (heure, jour de la semaine, week-end, nuit)
     - montant transformé en log
     - fréquence de transactions par client
+    - variables comportementales sur 7 jours (moyenne des montants, nombre de transactions)
     - regroupement des localisations rares sous 'Autre'
 
     Si `top_localisations` est fourni (cas de l'application, à l'inférence), les mêmes
@@ -55,6 +86,9 @@ def nettoyer_et_enrichir(df: pd.DataFrame, top_localisations=None, nb_localisati
 
     # Fréquence du client dans le jeu de données
     df_clean["nb_transactions_client"] = df_clean.groupby("ID Clients")["Identifiant operation"].transform("count")
+
+    # Variables comportementales (7 derniers jours)
+    df_clean = ajouter_variables_7j(df_clean)
 
     # Regroupement des localisations rares
     if top_localisations is None:
@@ -90,7 +124,9 @@ def preparer_transaction(transaction: dict, top_localisations, feature_columns) 
 
     transaction attend les clés :
         'Type de transaction', 'Status operation', 'Localisation', 'Date' (str ou datetime),
-        'Montant', 'nb_transactions_client' (optionnel, défaut = 1)
+        'Montant', 'nb_transactions_client' (optionnel, défaut = 1),
+        'montant_moyen_7j' (optionnel, défaut = montant courant),
+        'nb_trans_7j' (optionnel, défaut = 0, comme à l'entraînement sans historique)
     """
     date = pd.to_datetime(transaction["Date"])
     localisation = transaction["Localisation"] if transaction["Localisation"] in top_localisations else "Autre"
@@ -102,6 +138,8 @@ def preparer_transaction(transaction: dict, top_localisations, feature_columns) 
         "est_weekend": int(date.dayofweek in [5, 6]),
         "est_nuit": int(date.hour >= 22 or date.hour < 6),
         "nb_transactions_client": transaction.get("nb_transactions_client", 1),
+        "montant_moyen_7j": transaction.get("montant_moyen_7j", transaction["Montant"]),
+        "nb_trans_7j": transaction.get("nb_trans_7j", 0),
         f"Type de transaction_{transaction['Type de transaction']}": 1,
         f"Status operation_{transaction['Status operation']}": 1,
         f"Localisation_grp_{localisation}": 1,
