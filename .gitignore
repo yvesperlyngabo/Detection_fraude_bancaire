@@ -26,3 +26,4 @@ Thumbs.db
 .vscode/
 .idea/
 model/cv_results*.csv
+model/cv_results*.csv

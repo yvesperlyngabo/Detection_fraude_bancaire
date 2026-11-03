@@ -8,12 +8,15 @@ Pourquoi ce script ?
     (k plis x répétitions), et on rapporte une moyenne et un écart-type.
 
 Ce que le script compare :
-    - 4 modèles supervisés (mêmes réglages par défaut que train_model.py)
-    - 3 jeux de variables :
-        complet          : toutes les variables
-        sans_7j          : sans montant_moyen_7j ni nb_trans_7j
-        sans_comport.    : sans les variables 7 jours ni nb_transactions_client
-      Les mêmes plis sont utilisés pour les 3 jeux, ce qui permet une comparaison appariée.
+    - XGBoost et LightGBM (réglages par défaut de train_model.py) ; Random Forest et
+      Gradient Boosting s'ajoutent avec --tous-les-modeles (plus long)
+    - 4 jeux de variables :
+        reference        : état actuel (compte global nb_transactions_client + variables 7 jours)
+        causal           : compte des transactions PASSÉES (nb_trans_passees) + variables 7 jours,
+                           sans nb_transactions_client (qui compte aussi le futur du client)
+        causal_sans_7j   : compte des transactions passées seul
+        minimal          : aucune variable d'historique client
+      Les mêmes plis sont utilisés pour tous les jeux, ce qui permet une comparaison appariée.
 
 Métriques (classe "Fraude") : rappel, précision, F1 et AUC-PR (average precision).
 
@@ -27,6 +30,7 @@ Option --par-client :
 Usage (depuis la racine du projet) :
     python model/evaluate_cv.py
     python model/evaluate_cv.py --par-client
+    python model/evaluate_cv.py --par-client --tous-les-modeles
     python model/evaluate_cv.py --splits 5 --repeats 3
 Génère model/cv_results.csv, ou model/cv_results_par_client.csv avec --par-client.
 """
@@ -54,15 +58,17 @@ SORTIE_CSV = os.path.join(BASE_DIR, "model", "cv_results.csv")
 SORTIE_CSV_CLIENT = os.path.join(BASE_DIR, "model", "cv_results_par_client.csv")
 
 VARIABLES_7J = ["montant_moyen_7j", "nb_trans_7j"]
+COMPTE_GLOBAL = "nb_transactions_client"   # compte sur tout le jeu de données (passé ET futur)
+COMPTE_PASSE = "nb_trans_passees"          # compte des seules transactions antérieures
 METRIQUES = ["rappel", "precision", "f1", "auc_pr"]
 
 
-def get_estimateurs():
+def get_estimateurs(tous=False):
     """Mêmes modèles et réglages par défaut que train_model.py (sans les modèles faibles)."""
-    estimateurs = {
-        "Random Forest": lambda: RandomForestClassifier(random_state=42, n_jobs=-1),
-        "Gradient Boosting": lambda: GradientBoostingClassifier(random_state=42),
-    }
+    estimateurs = {}
+    if tous:
+        estimateurs["Random Forest"] = lambda: RandomForestClassifier(random_state=42, n_jobs=-1)
+        estimateurs["Gradient Boosting"] = lambda: GradientBoostingClassifier(random_state=42)
     try:
         from xgboost import XGBClassifier
         estimateurs["XGBoost"] = lambda: XGBClassifier(eval_metric="mlogloss", random_state=42)
@@ -81,7 +87,8 @@ def diagnostic_variables_7j(df_clean):
     avec_historique = df_clean["nb_trans_7j"] > 0
     print(f"Part des transactions ayant un historique sur 7 jours : {avec_historique.mean():.1%}")
     print("Moyennes par classe :")
-    print(df_clean.groupby("Target")[["nb_trans_7j", "montant_moyen_7j", "nb_transactions_client"]]
+    print(df_clean.groupby("Target")[["nb_trans_7j", "montant_moyen_7j", "nb_transactions_client",
+                                      "nb_trans_passees"]]
           .mean().round(2).to_string())
     print()
 
@@ -152,6 +159,8 @@ def main():
     parser.add_argument("--splits", type=int, default=5, help="nombre de plis (défaut : 5)")
     parser.add_argument("--repeats", type=int, default=2, help="nombre de répétitions (défaut : 2)")
     parser.add_argument("--csv", default=CSV_PATH, help="chemin du fichier de transactions")
+    parser.add_argument("--tous-les-modeles", action="store_true",
+                        help="ajoute Random Forest et Gradient Boosting (plus long)")
     parser.add_argument("--par-client", action="store_true",
                         help="plis par client (clients jamais vus à l'entraînement)")
     args = parser.parse_args()
@@ -169,9 +178,10 @@ def main():
     X = X.reset_index(drop=True)
 
     jeux = {
-        "complet": list(colonnes),
-        "sans_7j": [c for c in colonnes if c not in VARIABLES_7J],
-        "sans_comport.": [c for c in colonnes if c not in VARIABLES_7J + ["nb_transactions_client"]],
+        "reference": [c for c in colonnes if c != COMPTE_PASSE],
+        "causal": [c for c in colonnes if c != COMPTE_GLOBAL],
+        "causal_sans_7j": [c for c in colonnes if c not in [COMPTE_GLOBAL] + VARIABLES_7J],
+        "minimal": [c for c in colonnes if c not in [COMPTE_GLOBAL, COMPTE_PASSE] + VARIABLES_7J],
     }
     groupes = df_clean["ID Clients"].to_numpy()
     n_fraudes = int((y == label_fraude).sum())
@@ -179,7 +189,7 @@ def main():
     print(f"{len(y)} transactions, {n_fraudes} fraudes ; "
           f"{args.splits} plis x {args.repeats} répétitions ; plis {mode}.\n")
 
-    resultats = evaluer(X, y, groupes, label_fraude, get_estimateurs(), jeux,
+    resultats = evaluer(X, y, groupes, label_fraude, get_estimateurs(args.tous_les_modeles), jeux,
                         args.splits, args.repeats, args.par_client)
     sortie = SORTIE_CSV_CLIENT if args.par_client else SORTIE_CSV
     resultats.to_csv(sortie, index=False)
@@ -193,20 +203,20 @@ def main():
         morceaux = [f"{m}={ligne[(m, 'mean')]:.3f}±{ligne[(m, 'std')]:.3f}" for m in METRIQUES]
         print(f"{modele:18s} {jeu:14s} " + "  ".join(morceaux))
 
-    # --- Comparaison appariée : 'complet' contre les autres jeux, pli par pli ---
+    # --- Comparaison appariée : 'causal' contre les autres jeux, pli par pli ---
     print("\n" + "=" * 78)
-    print("COMPARAISON APPARIÉE : 'complet' moins l'autre jeu (positif = 'complet' meilleur)")
+    print("COMPARAISON APPARIÉE : 'causal' moins l'autre jeu (positif = 'causal' meilleur)")
     print("=" * 78)
-    for autre in ["sans_7j", "sans_comport."]:
-        print(f"\n'complet' contre '{autre}' :")
+    for autre in ["reference", "causal_sans_7j", "minimal"]:
+        print(f"\n'causal' contre '{autre}' :")
         for modele in resultats["modele"].unique():
-            a = resultats[(resultats.modele == modele) & (resultats.jeu == "complet")].set_index("pli")
+            a = resultats[(resultats.modele == modele) & (resultats.jeu == "causal")].set_index("pli")
             b = resultats[(resultats.modele == modele) & (resultats.jeu == autre)].set_index("pli")
             ecart = (a[METRIQUES] - b[METRIQUES])
             gains = (ecart["auc_pr"] > 0).mean()
             print(f"  {modele:18s} écart auc_pr={ecart['auc_pr'].mean():+.3f}±{ecart['auc_pr'].std():.3f}  "
                   f"écart rappel={ecart['rappel'].mean():+.3f}  "
-                  f"'complet' meilleur sur {gains:.0%} des plis (auc_pr)")
+                  f"'causal' meilleur sur {gains:.0%} des plis (auc_pr)")
 
     print(f"\nRésultats détaillés : {sortie}")
     print("Lecture : un écart n'est convaincant que s'il dépasse nettement son écart-type "

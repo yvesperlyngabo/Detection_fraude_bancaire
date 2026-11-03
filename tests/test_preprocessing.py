@@ -53,6 +53,25 @@ class TestPreprocessing(unittest.TestCase):
         self.assertEqual(c1.loc[1, "nb_trans_7j"], 1)
         self.assertEqual(c1.loc[1, "montant_moyen_7j"], 5000)
 
+    def test_nb_trans_passees(self):
+        """Compte l'historique complet du client, sans jamais regarder le futur."""
+        df = self.df_test.copy()
+        df.loc[len(df)] = ["C1", "A1", "OP4", "ATM", "Validé", "Dakar",
+                           "2023-02-15 09:00:00", 3000, "Normal"]   # bien après la fenêtre de 7 jours
+        df_clean, _ = nettoyer_et_enrichir(df)
+        c1 = df_clean[df_clean["ID Clients"] == "C1"].sort_values("Date").reset_index(drop=True)
+        self.assertEqual(list(c1["nb_trans_passees"]), [0, 1, 2])
+        # hors fenêtre de 7 jours, mais compté dans l'historique complet
+        self.assertEqual(c1.loc[2, "nb_trans_7j"], 0)
+
+    def test_nb_trans_passees_egalite_horodatage(self):
+        """Deux transactions au même instant ne se voient pas l'une l'autre."""
+        df = self.df_test.copy()
+        df.loc[1, "Date"] = df.loc[0, "Date"]
+        df_clean, _ = nettoyer_et_enrichir(df)
+        c1 = df_clean[df_clean["ID Clients"] == "C1"]
+        self.assertEqual(list(c1["nb_trans_passees"]), [0, 0])
+
     def test_ordre_des_lignes_conserve(self):
         """Le prétraitement ne réordonne pas les lignes (découpages train/test reproductibles)."""
         df = self.df_test.iloc[[2, 0, 1]].reset_index(drop=True)   # ordre volontairement mélangé
@@ -101,6 +120,7 @@ class TestPreprocessing(unittest.TestCase):
         df_ligne = preparer_transaction(transaction, top_loc, feature_columns)
         self.assertEqual(df_ligne["nb_trans_7j"].iloc[0], 0)
         self.assertEqual(df_ligne["montant_moyen_7j"].iloc[0], 7000)
+        self.assertEqual(df_ligne["nb_trans_passees"].iloc[0], 0)
 
 if __name__ == "__main__":
     unittest.main()

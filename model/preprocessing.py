@@ -15,7 +15,7 @@ COLONNES_CATEGORIELLES = ["Type de transaction", "Status operation", "Localisati
 # Colonnes numériques (brutes + dérivées)
 COLONNES_NUMERIQUES = [
     "log_montant", "heure", "jour_semaine", "est_weekend", "est_nuit",
-    "nb_transactions_client", "montant_moyen_7j", "nb_trans_7j",
+    "nb_transactions_client", "montant_moyen_7j", "nb_trans_7j", "nb_trans_passees",
 ]
 
 CLASSES_CIBLE = ["Normal", "Suspect", "Fraude"]
@@ -28,15 +28,18 @@ def charger_donnees(csv_path: str) -> pd.DataFrame:
 
 def ajouter_variables_7j(df: pd.DataFrame) -> pd.DataFrame:
     """
-    Ajoute les variables comportementales calculées sur les 7 jours précédant chaque
-    transaction d'un même client :
-        - montant_moyen_7j : montant moyen des transactions passées (la transaction
-          courante est exclue ; sans historique, on retient le montant courant)
-        - nb_trans_7j      : nombre de transactions passées (0 sans historique)
+    Ajoute des variables comportementales CAUSALES : pour chaque transaction, elles
+    n'utilisent que l'historique ANTÉRIEUR du même client.
+        - nb_trans_passees : nombre de transactions strictement antérieures du client,
+          sur tout son historique (0 pour la première). À la différence de
+          nb_transactions_client, qui compte aussi les transactions postérieures, cette
+          variable est calculable en production.
+        - montant_moyen_7j : montant moyen des transactions des 7 jours précédents
+          (sans historique, on retient le montant courant)
+        - nb_trans_7j      : nombre de transactions des 7 jours précédents (0 sans historique)
 
-    La fenêtre est fermée à gauche (closed="left") : seules les transactions
-    strictement antérieures sont utilisées, donc aucune fuite d'information depuis
-    la transaction courante ou les suivantes.
+    La fenêtre des variables 7 jours est fermée à gauche (closed="left") : la transaction
+    courante et les suivantes en sont exclues, donc aucune fuite d'information.
     L'ordre des lignes du dataframe d'entrée est conservé (le tri n'est que temporaire) :
     un découpage entraînement/test avec une graine fixe reste donc identique.
     """
@@ -55,6 +58,9 @@ def ajouter_variables_7j(df: pd.DataFrame) -> pd.DataFrame:
 
     df["montant_moyen_7j"] = df["montant_moyen_7j"].fillna(df["Montant"])
     df["nb_trans_7j"] = df["nb_trans_7j"].fillna(0)
+
+    # Transactions strictement antérieures du client (à égalité d'horodatage : même valeur)
+    df["nb_trans_passees"] = (df.groupby("ID Clients")["Date"].rank(method="min") - 1).astype(int)
 
     # Retour à l'ordre d'origine
     return df.sort_values("_ordre").drop(columns="_ordre").reset_index(drop=True)
@@ -131,7 +137,8 @@ def preparer_transaction(transaction: dict, top_localisations, feature_columns) 
         'Type de transaction', 'Status operation', 'Localisation', 'Date' (str ou datetime),
         'Montant', 'nb_transactions_client' (optionnel, défaut = 1),
         'montant_moyen_7j' (optionnel, défaut = montant courant),
-        'nb_trans_7j' (optionnel, défaut = 0, comme à l'entraînement sans historique)
+        'nb_trans_7j' (optionnel, défaut = 0, comme à l'entraînement sans historique),
+        'nb_trans_passees' (optionnel, défaut = 0, idem)
     """
     date = pd.to_datetime(transaction["Date"])
     localisation = transaction["Localisation"] if transaction["Localisation"] in top_localisations else "Autre"
@@ -145,6 +152,7 @@ def preparer_transaction(transaction: dict, top_localisations, feature_columns) 
         "nb_transactions_client": transaction.get("nb_transactions_client", 1),
         "montant_moyen_7j": transaction.get("montant_moyen_7j", transaction["Montant"]),
         "nb_trans_7j": transaction.get("nb_trans_7j", 0),
+        "nb_trans_passees": transaction.get("nb_trans_passees", 0),
         f"Type de transaction_{transaction['Type de transaction']}": 1,
         f"Status operation_{transaction['Status operation']}": 1,
         f"Localisation_grp_{localisation}": 1,
